@@ -6,7 +6,7 @@
 etc etc                               */
 TinyGPSPlus gps;
 static const int RXPin = 10, TXPin = 6; //el tx no lo uso, solo recibo data
-static const uint32_t GPSBaud = 9600;   //el baudrate del gps
+static const int GPSBaud = 9600;   //el baudrate del gps
 int hora;                               //declaro esto para hacer el gtm-3
 SoftwareSerial ss(RXPin, TXPin);
 
@@ -21,24 +21,23 @@ boolean ledAzul = true;
 boolean ledVerde = true;
 boolean ledRojo = true;
 // tiempos de eventos (en ms)
-int tiempoRebote = 20;      // tiempo que espera para evitar rebotes
-int tiempoDC = 250;         // tiempo entre que se suelta y se vuelve a presionar maximo para un doble click
-int tiempoHold = 500;       // tiempo de un hold corto
-int tiempoHoldLargo = 1500; // tiempo de un hold largo
+unsigned int tiempoRebote = 20;      // tiempo que espera para evitar rebotes
+unsigned int tiempoDC = 250;         // tiempo entre que se suelta y se vuelve a presionar maximo para un doble click
+unsigned int tiempoHold = 500;       // tiempo de un hold corto
+unsigned int tiempoHoldLargo = 1500; // tiempo de un hold largo
 // Variables para los estados
 boolean valorActual = HIGH;   // valor actual de la entrada / high es suelto, low es presionado
 boolean valorAnterior = HIGH; // valor previo (para detectar cambios)
-long momentoPulsado = -1;     // momento en que se presiono el boton
-long momentoLiberado = -1;    // momento en que se suelta el boton
-long tiempoPresionado = 0;    // cantidad de tiempo entre que se presiono y se solto
+unsigned long momentoPulsado = -1;     // momento en que se presiono el boton
+unsigned long momentoLiberado = -1;    // momento en que se suelta el boton
+unsigned long tiempoPresionado = 0;    // cantidad de tiempo entre que se presiono y se solto
 //estas me parece que complican todo al pedo
 boolean DCwaiting = false;  // whether we're waiting for a double click (down)
 boolean DCalSoltar = false; // whether to register a double click on next release, or whether to wait and click
 boolean clickOK = true;     // se puede hacer un click
 boolean ignoreUp = false;   // whether to ignore the button release because the click+hold was triggered
 
-/* definiciones de la SD
-*/
+/* definiciones de la SD*/
 const int chipSelect = 9;
 
 void setup()
@@ -54,47 +53,24 @@ void setup()
   digitalWrite(salidaRojo, ledRojo);
 
   Serial.begin(115200); //para comunicarse con la pc, solo para debugging
+  ss.begin(GPSBaud);    //inicia el gps
 
-  ss.begin(GPSBaud); //inicia el gps
-
-
-
-/*de aca para abajo prueba la SD*/
-  Serial.print("Arrancando la SD"); //debugging
+  /*de aca para abajo prueba la SD*/
   if (!SD.begin(chipSelect))
   {
-    Serial.println("Error para cargarla");
     while (1)
       ; //si falla, se clava ahi
   }
-  Serial.println("arranco joya pa");
-  // abre el archivo(solo uno a la vez)
- 
 }
 
 void loop()
 {
   int b = checkButton();
-  int tiempo;
-  tiempo=millis()%10000;
-  clicksalida(b);
-  if(tiempo==0){
-    if(gps.location.age()<100){
-  printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
-  printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 6, 1);
-  printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
-  printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
-  printInt(gps.location.age(), gps.location.isValid(), 5);
-  printDateTime(gps.date, gps.time);
-  printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
-  printFloat(gps.course.deg(), gps.course.isValid(), 7, 2);
-  printFloat(gps.speed.kmph(), gps.speed.isValid(), 6, 2);
-  Serial.println(); 
-}
-  leerArchivo();
-  }
-  //lee datos
-    while (ss.available())
+  unsigned long tiempo;
+  tiempo = millis() % 10000;
+  clicksalida(b); //en esta funcion deberia escribir en el archivo, etc
+                  //lee datos
+  while (ss.available())
   {
     gps.encode(ss.read());
   };
@@ -110,10 +86,21 @@ void clicksalida(int b)
   case 1:
     ledAzul = !ledAzul;
     digitalWrite(salidaAzul, ledAzul);
+    printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
+    printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 6, 1);
+    printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
+    printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
+    printInt(gps.location.age(), gps.location.isValid(), 5);
+    printDateTime(gps.date, gps.time);
+    printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
+    printFloat(gps.course.deg(), gps.course.isValid(), 7, 2);
+    printFloat(gps.speed.kmph(), gps.speed.isValid(), 6, 2);
+    Serial.println();
     break;
   case 2:
     ledVerde = !ledVerde;
     digitalWrite(salidaVerde, ledVerde);
+    leerArchivo();
     break;
   case 3:
     ledRojo = !ledRojo;
@@ -131,10 +118,10 @@ void clicksalida(int b)
     break;
   }
 }
+
 void leerArchivo()
 {
-   File dataFile = SD.open("caca.txt");
-
+  File dataFile = SD.open("caca.txt");
   if (dataFile) //si existe el archivo hace esto
   {
     while (dataFile.available())
@@ -147,7 +134,9 @@ void leerArchivo()
   {
     Serial.println("no se pudo abrir el archivo");
   }
+  Serial.println();
 }
+
 int checkButton()
 {
   int event = 0;
@@ -217,6 +206,9 @@ int checkButton()
   valorAnterior = valorActual;
   return event;
 }
+
+
+
 //funciones para escribir en el puerto serie
 static void printFloat(float val, bool valid, int len, int prec)
 {
