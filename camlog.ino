@@ -66,8 +66,8 @@ void setup()
 void loop()
 {
   int b = checkButton();
-  unsigned long tiempo;
-  tiempo = millis() % 10000;
+  //aca habia querido hacer un contador pero usando el resto en millis
+  //y aparentemente eso estaba generando que funcione lento el programa
   clicksalida(b); //en esta funcion deberia escribir en el archivo, etc
                   //lee datos
   while (ss.available())
