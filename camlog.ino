@@ -6,43 +6,40 @@
 etc etc                               */
 TinyGPSPlus gps;
 static const int RXPin = 10, TXPin = 6; //el tx no lo uso, solo recibo data
-static const int GPSBaud = 9600;   //el baudrate del gps
+static const int GPSBaud = 9600;        //el baudrate del gps
 int hora;                               //declaro esto para hacer el gtm-3
 SoftwareSerial ss(RXPin, TXPin);
 
-/*de aca para abajo van las definiciones para los botones
-cuando se cambien las funciones las salidas de los pins se van a apagar*/
 #define buttonPin 8
 #define salidaAzul 18
 #define salidaVerde 19
 #define salidaRojo 20
-// estado de los colores del led, se encienden en bajo
+// *estado de los colores del led, se encienden en bajo
 boolean ledAzul = true;
 boolean ledVerde = true;
 boolean ledRojo = true;
-// tiempos de eventos (en ms)
+// *tiempos de eventos (en ms)
 unsigned int tiempoRebote = 20;      // tiempo que espera para evitar rebotes
 unsigned int tiempoDC = 250;         // tiempo entre que se suelta y se vuelve a presionar maximo para un doble click
 unsigned int tiempoHold = 500;       // tiempo de un hold corto
 unsigned int tiempoHoldLargo = 1500; // tiempo de un hold largo
-// Variables para los estados
-boolean valorActual = HIGH;   // valor actual de la entrada / high es suelto, low es presionado
-boolean valorAnterior = HIGH; // valor previo (para detectar cambios)
-unsigned long momentoPulsado = -1;     // momento en que se presiono el boton
-unsigned long momentoLiberado = -1;    // momento en que se suelta el boton
-unsigned long tiempoPresionado = 0;    // cantidad de tiempo entre que se presiono y se solto
-//estas me parece que complican todo al pedo
-boolean DCwaiting = false;  // whether we're waiting for a double click (down)
+// *Variables para los estados
+boolean valorActual = HIGH;         // valor actual de la entrada / high es suelto, low es presionado
+boolean valorAnterior = HIGH;       // valor previo (para detectar cambios)
+unsigned long momentoPulsado = -1;  // momento en que se presiono el boton
+unsigned long momentoLiberado = -1; // momento en que se suelta el boton
+unsigned long tiempoPresionado = 0; // cantidad de tiempo entre que se presiono y se solto
+//TODO: revisar esto
+boolean esperaDC = false;   // whether we're waiting for a double click (down)
 boolean DCalSoltar = false; // whether to register a double click on next release, or whether to wait and click
 boolean clickOK = true;     // se puede hacer un click
-boolean ignoreUp = false;   // whether to ignore the button release because the click+hold was triggered
 
-/* definiciones de la SD*/
+// !definiciones de la SD
 const int chipSelect = 9;
 
 void setup()
 {
-  // Define las cosas para el boton
+  // ! Define las cosas para el boton
   pinMode(buttonPin, INPUT);
   digitalWrite(buttonPin, HIGH);
   pinMode(salidaAzul, OUTPUT);
@@ -55,7 +52,7 @@ void setup()
   Serial.begin(115200); //para comunicarse con la pc, solo para debugging
   ss.begin(GPSBaud);    //inicia el gps
 
-  /*de aca para abajo prueba la SD*/
+  //!de aca para abajo prueba la SD
   if (!SD.begin(chipSelect))
   {
     while (1)
@@ -66,7 +63,7 @@ void setup()
 void loop()
 {
   int b = checkButton();
-  //aca habia querido hacer un contador pero usando el resto en millis
+  // *aca habia querido hacer un contador pero usando el resto en millis
   //y aparentemente eso estaba generando que funcione lento el programa
   clicksalida(b); //en esta funcion deberia escribir en el archivo, etc
                   //lee datos
@@ -141,73 +138,58 @@ int checkButton()
 {
   int event = 0;
   valorActual = digitalRead(buttonPin);
-  //eventos posibles:
-  //presiona el boton
+  //!presiona el boton
   if (valorActual == LOW && valorAnterior == HIGH && (millis() - momentoLiberado) > tiempoRebote)
   {
     momentoPulsado = millis();
-    ignoreUp = false;
-    clickOK = true;
-    if ((millis() - momentoLiberado) < tiempoDC && DCalSoltar == false && DCwaiting == true)
-      DCalSoltar = true;
+    clickOK = true; // habilita que se mande un click
+    if ((momentoPulsado - momentoLiberado) < tiempoDC && DCalSoltar == false && esperaDC == true)
+      DCalSoltar = true; //si se presiona dentro de la ventana temporal, habilita el flag
     else
       DCalSoltar = false;
-    DCwaiting = false;
+    esperaDC = false;
   }
-  // Se suelta el boton
+  // !Se suelta el boton
   else if (valorActual == HIGH && valorAnterior == LOW && (millis() - momentoPulsado) > tiempoRebote)
   {
     momentoLiberado = millis();
     tiempoPresionado = momentoLiberado - momentoPulsado;
-
-    //de aca para abajo tengo que revisar
-    if (not ignoreUp)
+    if (DCalSoltar == false)
     {
-      momentoLiberado = millis();
-      if (DCalSoltar == false)
-        DCwaiting = true;
-      else
+      if (tiempoPresionado > tiempoHoldLargo)
       {
-        event = 2;
-        DCalSoltar = false;
-        DCwaiting = false;
+        event = 4;
         clickOK = false;
+        esperaDC = false;
+        tiempoPresionado = 0;
       }
+      else if (tiempoPresionado > tiempoHold)
+      {
+        event = 3;
+        clickOK = false;
+        esperaDC = false;
+        tiempoPresionado = 0;
+      }
+      else
+        esperaDC = true;
+    }
+    else
+    {
+      event = 2;
+      DCalSoltar = false;
+      esperaDC = false;
+      clickOK = false;
     }
   }
-
-  if (valorActual == HIGH && (millis() - momentoLiberado) >= tiempoDC && DCwaiting == true && DCalSoltar == false && clickOK == true)
+  //!caduca el tiempo maximo y envia un click
+  if (valorActual == HIGH && (millis() - momentoLiberado) >= tiempoDC && esperaDC == true && DCalSoltar == false && clickOK == true)
   {
     event = 1;
-    DCwaiting = false;
+    esperaDC = false;
   }
-
-  //aca irian los distintos estados con sus entradas y salidas
-  /*los mas faciles de definir son los holds con un par de if
-  si el tiempo de hold es mayor al largo, hacer una cosa
-  si no, si es mas largo que el hold corto, hace la otra cosa
-  en ambos casos actualiza los flags
-  tengo que definir como hacer un click y doble click
-  y que no hayan conflictos*/
-
-  if (tiempoPresionado > tiempoHoldLargo)
-  {
-    event = 4;
-    clickOK = false;
-    tiempoPresionado = 0;
-  }
-  else if (tiempoPresionado > tiempoHold)
-  {
-    event = 3;
-    clickOK = false;
-    tiempoPresionado = 0;
-  }
-
   valorAnterior = valorActual;
   return event;
 }
-
-
 
 //funciones para escribir en el puerto serie
 static void printFloat(float val, bool valid, int len, int prec)
