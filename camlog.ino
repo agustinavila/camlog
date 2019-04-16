@@ -76,7 +76,7 @@ void loop()
     Serial.println(F("No GPS data received: check wiring"));
 }
 
-void clicksalida(int b)
+void clicksalida(int b)   //TODO: reutilizar esta funcion para integrar escritura de SD
 {
   switch (b)
   {
@@ -192,6 +192,7 @@ int checkButton()
 }
 
 //funciones para escribir en el puerto serie
+//TODO: REVISAR TODAS ESTAS FUNCIONES PARA SIMPLIFICARLAS
 static void printFloat(float val, bool valid, int len, int prec)
 {
   if (!valid)
